@@ -1,0 +1,154 @@
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Fake networking for js/wasm and wasip1/wasm.
+
+//go:build js || wasip1
+
+package syscall
+
+import (
+	"unsafe"
+)
+
+const (
+	AF_UNSPEC = iota
+	AF_UNIX
+	AF_INET
+	AF_INET6
+)
+
+const (
+	SOCK_STREAM = 1 + iota
+	SOCK_DGRAM
+	SOCK_RAW
+	SOCK_SEQPACKET
+)
+
+const (
+	IPPROTO_IP   = 0
+	IPPROTO_IPV4 = 4
+	IPPROTO_IPV6 = 0x29
+	IPPROTO_TCP  = 6
+	IPPROTO_UDP  = 0x11
+)
+
+const (
+	SOMAXCONN = 0x80
+)
+
+const (
+	_ = iota
+	IPV6_V6ONLY
+	SO_ERROR
+)
+
+// Misc constants expected by package net but not supported.
+const (
+	_ = iota
+	F_DUPFD_CLOEXEC
+	SYS_FCNTL = 500 // unsupported
+)
+
+type Sockaddr interface {
+	sockaddr() (ptr unsafe.Pointer, err error)
+	sockport() int
+}
+
+type SockaddrInet4 struct {
+	Addr [4]byte
+	Port int
+
+	raw addressBuffer
+}
+
+func (s *SockaddrInet4) sockaddr() (unsafe.Pointer, error) {
+	s.raw.bufLen = 4
+	s.raw.buf = uintptr32(uintptr(unsafe.Pointer(&s.Addr)))
+	return unsafe.Pointer(&s.raw), nil
+}
+
+func (s *SockaddrInet4) sockport() int {
+	return int(s.Port)
+}
+
+type SockaddrInet6 struct {
+	Addr   [16]byte
+	Port   int
+	ZoneId uint32
+
+	raw addressBuffer
+}
+
+func (s *SockaddrInet6) sockaddr() (unsafe.Pointer, error) {
+	if s.ZoneId != 0 {
+		return nil, ENOTSUP
+	}
+	s.raw.bufLen = 16
+	s.raw.buf = uintptr32(uintptr(unsafe.Pointer(&s.Addr)))
+	return unsafe.Pointer(&s.raw), nil
+}
+
+func (s *SockaddrInet6) sockport() int {
+	return int(s.Port)
+}
+
+type SockaddrUnix struct {
+	Name string
+
+	raw rawSockaddrAny
+	buf addressBuffer
+}
+
+func (s *SockaddrUnix) sockaddr() (unsafe.Pointer, error) {
+	s.raw.family = AF_UNIX
+	if len(s.Name) >= len(s.raw.addr)-1 {
+		return nil, EINVAL
+	}
+	copy(s.raw.addr[:], s.Name)
+	s.raw.addr[len(s.Name)] = 0
+	s.buf.bufLen = 128
+	s.buf.buf = uintptr32(uintptr(unsafe.Pointer(&s.raw)))
+	return unsafe.Pointer(&s.buf), nil
+}
+
+func (s *SockaddrUnix) sockport() int {
+	return 0
+}
+
+type addressBuffer struct {
+	buf    uintptr32
+	bufLen size
+}
+
+type rawSockaddrAny struct {
+	family uint16
+	addr   [126]byte
+}
+
+func anyToSockaddr(rsa *rawSockaddrAny, port uint32) (Sockaddr, error) {
+	switch rsa.family {
+	case AF_INET:
+		addr := SockaddrInet4{Port: int(port)}
+		copy(addr.Addr[:], rsa.addr[:])
+		return &addr, nil
+	case AF_INET6:
+		addr := SockaddrInet6{Port: int(port)}
+		copy(addr.Addr[:], rsa.addr[:])
+		return &addr, nil
+	case AF_UNIX:
+		addr := SockaddrUnix{}
+		addr.Name = string(rsa.addr[:strlen(rsa.addr[:])])
+		return &addr, nil
+	default:
+		return nil, ENOTSUP
+	}
+}
+
+func strlen(b []byte) (n int) {
+	for n < len(b) && b[n] != 0 {
+		n++
+	}
+	return n
+}
