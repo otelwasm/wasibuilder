@@ -14,24 +14,27 @@ import (
 
 const (
 	AF_UNSPEC = iota
-	AF_UNIX
 	AF_INET
 	AF_INET6
+	AF_UNIX
 )
 
 const (
-	SOCK_STREAM = 1 + iota
+	SOCK_ANY = iota
 	SOCK_DGRAM
-	SOCK_RAW
-	SOCK_SEQPACKET
+	SOCK_STREAM
+	// TODO: The two below isn't supported on WASI
+	SOCK_RAW = 0
+	SOCK_SEQPACKET = 0
 )
 
 const (
-	IPPROTO_IP   = 0
-	IPPROTO_IPV4 = 4
-	IPPROTO_IPV6 = 0x29
-	IPPROTO_TCP  = 6
-	IPPROTO_UDP  = 0x11
+	IPPROTO_IP = iota
+	IPPROTO_TCP
+	IPPROTO_UDP
+	// TODO: The two below isn't supported on WASI
+	IPPROTO_IPV4 = 0
+	IPPROTO_IPV6 = 0
 )
 
 const (
@@ -39,9 +42,31 @@ const (
 )
 
 const (
+	SOL_SOCKET = iota
+)
+
+const (
 	_ = iota
 	IPV6_V6ONLY
+)
+
+const (
+	SO_REUSEADDR = iota
+	SO_TYPE
 	SO_ERROR
+	SO_DONTROUTE
+	SO_BROADCAST
+	SO_SNDBUF
+	SO_RCVBUF
+	SO_KEEPALIVE
+	SO_OOBINLINE
+	SO_LINGER
+	SO_RCVLOWAT
+	SO_RCVTIMEO
+	SO_SNDTIMEO
+	SO_ACCEPTCONN
+	SO_BINDTODEVICE
+	TCP_NODELAY
 )
 
 // Misc constants expected by package net but not supported.
@@ -58,12 +83,14 @@ type Sockaddr interface {
 
 type SockaddrInet4 struct {
 	Addr [4]byte
-	Port int
+	port uint32
 
-	raw addressBuffer
+	Port int
+	raw  addressBuffer
 }
 
 func (s *SockaddrInet4) sockaddr() (unsafe.Pointer, error) {
+	s.port = uint32(s.Port)
 	s.raw.bufLen = 4
 	s.raw.buf = uintptr32(uintptr(unsafe.Pointer(&s.Addr)))
 	return unsafe.Pointer(&s.raw), nil
@@ -75,16 +102,18 @@ func (s *SockaddrInet4) sockport() int {
 
 type SockaddrInet6 struct {
 	Addr   [16]byte
-	Port   int
+	port   uint32
 	ZoneId uint32
 
-	raw addressBuffer
+	Port int
+	raw  addressBuffer
 }
 
 func (s *SockaddrInet6) sockaddr() (unsafe.Pointer, error) {
 	if s.ZoneId != 0 {
 		return nil, ENOTSUP
 	}
+	s.port = uint32(s.Port)
 	s.raw.bufLen = 16
 	s.raw.buf = uintptr32(uintptr(unsafe.Pointer(&s.Addr)))
 	return unsafe.Pointer(&s.raw), nil
@@ -144,6 +173,30 @@ func anyToSockaddr(rsa *rawSockaddrAny, port uint32) (Sockaddr, error) {
 	default:
 		return nil, ENOTSUP
 	}
+}
+
+func sockaddrToAny(sa Sockaddr) (rawSockaddrAny, error) {
+	var rsa rawSockaddrAny
+	switch sa := sa.(type) {
+	case *SockaddrInet4:
+		copy(rsa.addr[:], sa.Addr[:])
+		rsa.family = AF_INET
+	case *SockaddrInet6:
+		copy(rsa.addr[:], sa.Addr[:])
+		rsa.family = AF_INET6
+	case *SockaddrUnix:
+		b := make([]byte, len(sa.Name) + 1)
+		if len(b) > 125 {
+			return rawSockaddrAny{}, ENOTSUP
+		}
+		copy(b, sa.Name)
+		copy(rsa.addr[:], b)
+		rsa.family = AF_UNIX
+	default:
+		return rawSockaddrAny{}, ENOTSUP
+	}
+
+	return rsa, nil
 }
 
 func strlen(b []byte) (n int) {

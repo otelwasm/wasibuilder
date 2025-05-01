@@ -1,0 +1,24 @@
+package net
+
+import (
+	"internal/poll"
+	"os"
+	"syscall"
+)
+
+// Wrapper around the socket system call that marks the returned file
+// descriptor as nonblocking and close-on-exec.
+func sysSocket(family, sotype, proto int) (int, error) {
+	s, err := socketFunc(family, sotype, proto)
+	if err == nil {
+		syscall.CloseOnExec(s)
+	}
+	if err != nil {
+		return -1, os.NewSyscallError("socket", err)
+	}
+	if err = syscall.SetNonblock(s, true); err != nil {
+		poll.CloseFunc(s)
+		return -1, os.NewSyscallError("setnonblock", err)
+	}
+	return s, nil
+}

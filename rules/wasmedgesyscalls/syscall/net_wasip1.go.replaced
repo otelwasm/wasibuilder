@@ -59,6 +59,31 @@ func sock_getlocaladdr(fd int32, addr unsafe.Pointer, port unsafe.Pointer) Errno
 //go:noescape
 func sock_getpeeraddr(fd int32, addr unsafe.Pointer, port unsafe.Pointer) Errno
 
+//go:wasmimport wasi_snapshot_preview1 sock_recv_from
+//go:noescape
+func sock_recv_from(
+	fd int32,
+	iovs unsafe.Pointer,
+	iovsCount int32,
+	addr unsafe.Pointer,
+	iflags int32,
+	port unsafe.Pointer,
+	nread unsafe.Pointer,
+	oflags unsafe.Pointer,
+) Errno
+
+//go:wasmimport wasi_snapshot_preview1 sock_send_to
+//go:noescape
+func sock_send_to(
+	fd int32,
+	iovs unsafe.Pointer,
+	iovsCount int32,
+	addr unsafe.Pointer,
+	port int32,
+	flags int32,
+	nwritten unsafe.Pointer,
+) Errno
+
 func Socket(proto, sotype, unused int) (fd int, err error) {
 	// TODO: Check if disable ipv6 is needed
 	var newfd int32
@@ -113,11 +138,74 @@ func Connect(fd int, sa Sockaddr) error {
 }
 
 func Recvfrom(fd int, p []byte, flags int) (n int, from Sockaddr, err error) {
-	return 0, nil, ENOSYS
+	iovsBuf := make([]iovec, 1, 8)
+	iovsBuf[0] = iovec{
+		buf: uintptr32(uintptr(unsafe.Pointer(unsafe.SliceData(p)))),
+		bufLen: size(len(p)),
+	}
+	var addr rawSockaddrAny
+	var port int32
+	addrBuf := addressBuffer{
+		buf:    uintptr32(uintptr(unsafe.Pointer(&addr))),
+		bufLen: uint32(unsafe.Sizeof(addr)),
+	}
+	nread, oflags := int32(0), int32(0)
+	errno := sock_recv_from(
+		int32(fd),
+		unsafe.Pointer(unsafe.SliceData(iovsBuf)),
+		int32(len(iovsBuf)),
+		unsafe.Pointer(&addrBuf),
+		int32(flags),
+		unsafe.Pointer(&port),
+		unsafe.Pointer(&nread),
+		unsafe.Pointer(&oflags),
+	)
+	from, err = anyToSockaddr(&addr, uint32(port))
+	if errno != 0 {
+		return int(nread), from, errno
+	}
+	if err != nil {
+		return int(nread), nil, err
+	}
+	runtime.KeepAlive(addrBuf)
+	runtime.KeepAlive(iovsBuf)
+	runtime.KeepAlive(p)
+	return int(nread), from, nil
 }
 
 func Sendto(fd int, p []byte, flags int, to Sockaddr) error {
-	return ENOSYS
+	iovsBuf := make([]iovec, 1, 8)
+	iovsBuf[0] = iovec{
+		buf: uintptr32(uintptr(unsafe.Pointer(unsafe.SliceData(p)))),
+		bufLen: size(len(p)),
+	}
+	addr, err := sockaddrToAny(to)
+	if err != nil {
+		return err
+	}
+	port := to.sockport()
+
+	addrBuf := addressBuffer{
+		buf:    uintptr32(uintptr(unsafe.Pointer(&addr))),
+		bufLen: uint32(unsafe.Sizeof(addr)),
+	}
+	nwritten := int32(0)
+	errno := sock_send_to(
+		int32(fd),
+		unsafe.Pointer(unsafe.SliceData(iovsBuf)),
+		int32(len(iovsBuf)),
+		unsafe.Pointer(&addrBuf),
+		int32(port),
+		int32(flags),
+		unsafe.Pointer(&nwritten),
+	)
+	if errno != 0 {
+		return errno
+	}
+	runtime.KeepAlive(addrBuf)
+	runtime.KeepAlive(iovsBuf)
+	runtime.KeepAlive(p)
+	return nil
 }
 
 func Recvmsg(fd int, p, oob []byte, flags int) (n, oobn, recvflags int, from Sockaddr, err error) {
