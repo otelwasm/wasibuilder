@@ -3,19 +3,9 @@ package main
 import (
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"os"
-	"time"
 )
-
-func init() {
-	dialer := &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-	http.DefaultTransport.(*http.Transport).DialContext = dialer.DialContext
-}
 
 func main() {
 	resp, err := http.Get("http://httpbin.org/get")

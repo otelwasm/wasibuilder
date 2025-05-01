@@ -26,6 +26,8 @@ func (w *WASMEdgeSyscalls) Apply(ctx *ExecContext) error {
 		err = w.processSyscallPackage(ctx)
 	case "net":
 		err = w.processNetPackage(ctx)
+	case "net/http":
+		err = w.processHTTPPackage(ctx)
 	case "internal/poll":
 		err = w.processPollPackage(ctx)
 	default:
@@ -42,33 +44,27 @@ func (w *WASMEdgeSyscalls) Apply(ctx *ExecContext) error {
 }
 
 func (w *WASMEdgeSyscalls) processSyscallPackage(ctx *ExecContext) error {
-	var replacedFiles = map[string]string{
-		"src/syscall/net_fake.go":   "syscall/net_fake.go.replaced",
-		"src/syscall/net_wasip1.go": "syscall/net_wasip1.go.replaced",
+	var removedFiles = []string{
+		"src/syscall/net_fake.go",
+		"src/syscall/net_wasip1.go",
+	}
+	var addedFilesFromFS = []string{
+		"syscall/net_fake.go.replaced",
+		"syscall/net_wasip1.go.replaced",
 	}
 
-	for src, dst := range replacedFiles {
-		// Read the file from the embedded filesystem
-		content, err := fs.ReadFile("wasmedgesyscalls/" + dst)
-		if err != nil {
-			slog.Error("Error reading embedded file", "file", dst, "error", err)
-			return err
-		}
-		// Prepare a temporary file with the content
-		tmpFile, err := w.prepareTmpFile(string(content))
-		if err != nil {
-			slog.Error("Error preparing temp file", "file", dst, "error", err)
-			return err
-		}
-
-		for i, arg := range ctx.Args {
-			if strings.HasSuffix(arg, src) {
-				// Replace the argument with the temporary file path
-				ctx.Args[i] = tmpFile
-				slog.Info("Replaced argument", "original", arg, "replacement", tmpFile)
-			}
-		}
+	_, err := w.removeFiles(ctx, removedFiles)
+	if err != nil {
+		slog.Error("Error removing files", "error", err)
+		return err
 	}
+
+	err = w.addFilesFromFS(ctx, addedFilesFromFS)
+	if err != nil {
+		slog.Error("Error adding files from FS", "error", err)
+		return err
+	}
+
 	return nil
 }
 
@@ -91,8 +87,66 @@ func (w *WASMEdgeSyscalls) processNetPackage(ctx *ExecContext) error {
 		"net/sockopt_wasip1.go.added",
 	}
 
-	var baseDir string
-	for _, src := range removedFiles {
+	baseDir, err := w.removeFiles(ctx, removedFiles)
+	if err != nil {
+		slog.Error("Error removing files", "error", err)
+		return err
+	}
+
+	err = w.addFilesFromLocal(ctx, baseDir, addedFiles)
+	if err != nil {
+		slog.Error("Error adding files from local", "error", err)
+		return err
+	}
+
+	err = w.addFilesFromFS(ctx, addedFilesFromFS)
+	if err != nil {
+		slog.Error("Error adding files from FS", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (w *WASMEdgeSyscalls) processHTTPPackage(ctx *ExecContext) error {
+	var removedFiles = []string{
+		"src/net/http/transport_default_wasm.go",
+	}
+	var addedFiles = []string{
+		"src/net/http/transport_default_other.go",
+	}
+
+	baseDir, err := w.removeFiles(ctx, removedFiles)
+	if err != nil {
+		slog.Error("Error removing files", "error", err)
+		return err
+	}
+
+	err = w.addFilesFromLocal(ctx, baseDir, addedFiles)
+	if err != nil {
+		slog.Error("Error adding files from local", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (w *WASMEdgeSyscalls) processPollPackage(ctx *ExecContext) error {
+	var addedFilesFromFS = []string{
+		"poll/sockopt.go.added",
+	}
+
+	err := w.addFilesFromFS(ctx, addedFilesFromFS)
+	if err != nil {
+		slog.Error("Error adding files from FS", "error", err)
+		return err
+	}
+
+	return nil
+}
+
+func (w *WASMEdgeSyscalls) removeFiles(ctx *ExecContext, files []string) (baseDir string, err error) {
+	for _, src := range files {
 		for i, arg := range ctx.Args {
 			b, found := strings.CutSuffix(arg, src)
 
@@ -108,55 +162,34 @@ func (w *WASMEdgeSyscalls) processNetPackage(ctx *ExecContext) error {
 		}
 	}
 
-	for _, src := range addedFiles {
+	return baseDir, nil
+}
+
+func (w *WASMEdgeSyscalls) addFilesFromLocal(ctx *ExecContext, baseDir string, files []string) error {
+	for _, src := range files {
 		addedPath := filepath.Join(baseDir, src)
 
 		ctx.Args = append(ctx.Args, addedPath)
 		slog.Info("Added argument", "added", addedPath)
 	}
 
-	for _, src := range addedFilesFromFS {
-		// Read the file from the embedded filesystem
-		content, err := fs.ReadFile("wasmedgesyscalls/" + src)
-		if err != nil {
-			slog.Error("Error reading embedded file", "file", src, "error", err)
-			return err
-		}
-
-		// Prepare a temporary file with the content
-		tmpFile, err := w.prepareTmpFile(string(content))
-		if err != nil {
-			slog.Error("Error preparing temp file", "file", src, "error", err)
-			return err
-		}
-
-		ctx.Args = append(ctx.Args, tmpFile)
-		slog.Info("Added argument", "added", tmpFile)
-	}
-
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) processPollPackage(ctx *ExecContext) error {
-	var addedFilesFromFS = []string{
-		"poll/sockopt.go.added",
-	}
-
-	for _, src := range addedFilesFromFS {
+func (w *WASMEdgeSyscalls) addFilesFromFS(ctx *ExecContext, files []string) error {
+	for _, src := range files {
 		// Read the file from the embedded filesystem
 		content, err := fs.ReadFile("wasmedgesyscalls/" + src)
 		if err != nil {
 			slog.Error("Error reading embedded file", "file", src, "error", err)
 			return err
 		}
-
 		// Prepare a temporary file with the content
 		tmpFile, err := w.prepareTmpFile(string(content))
 		if err != nil {
 			slog.Error("Error preparing temp file", "file", src, "error", err)
 			return err
 		}
-
 		ctx.Args = append(ctx.Args, tmpFile)
 		slog.Info("Added argument", "added", tmpFile)
 	}
