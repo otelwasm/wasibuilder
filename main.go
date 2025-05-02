@@ -17,6 +17,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if os.Getenv("WASIBUILDER_DEBUG") != "" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	switch os.Args[1] {
 	case "help", "--help", "-h":
 		fmt.Println("wasibuilder: A tool to modify Go build arguments for WASI.")
