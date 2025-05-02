@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	resp, err := http.Get("http://httpbin.org/get")
+	resp, err := http.Get("http://example.com")
 	if err != nil {
 		panic(err)
 	}
