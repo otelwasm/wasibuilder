@@ -156,7 +156,7 @@ func (w *WASMEdgeNet) removeFiles(ctx *ExecContext, files []string, logger *slog
 
 			// Remove the argument
 			ctx.Args = append(ctx.Args[:i], ctx.Args[i+1:]...)
-			logger.Info("Removed argument", "removed", arg)
+			logger.Debug("Removed argument", "removed", arg)
 
 			baseDir = b
 		}
