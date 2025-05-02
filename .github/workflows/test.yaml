@@ -1,0 +1,36 @@
+name: "Run tests"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        go-version: 
+          - 1.24.0
+          - 1.24.1
+          - 1.24.2
+          - 1.24.3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Install dependencies
+        run: go mod download
+      - name: Install wasirun
+        run: |
+          go install github.com/stealthrocket/wasi-go/cmd/wasirun@latest
+      - name: Run tests
+        run: go test -v ./...

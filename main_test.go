@@ -18,16 +18,17 @@ func TestAll(t *testing.T) {
 	}
 	wasibuilderPath := filepath.Join(wd, "bin/wasibuilder")
 
-	cmd := exec.Command("go", "build", "-a", "-o", "bin/httpget.wasm", "-toolexec", wasibuilderPath, "testdata/httpget/main.go")
-	cmd.Env = append(
-		os.Environ(),
-		"GOOS=wasip1",
-		"GOARCH=wasm",
-	)
+	cmd := exec.Command(wasibuilderPath, "go", "build", "-o", "bin/httpget.wasm", "testdata/httpget/main.go")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to run command: %v", err)
+	}
+
+	b, err := exec.Command("wasirun", "bin/httpget.wasm").CombinedOutput()
+	t.Log(string(b))
+	if err != nil {
 		t.Fatalf("failed to run command: %v", err)
 	}
 }
