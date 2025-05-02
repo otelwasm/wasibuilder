@@ -170,7 +170,7 @@ func (w *WASMEdgeNet) addFilesFromLocal(ctx *ExecContext, baseDir string, files 
 		addedPath := filepath.Join(baseDir, src)
 
 		ctx.Args = append(ctx.Args, addedPath)
-		logger.Info("Added argument", "added", addedPath)
+		logger.Debug("Added argument", "added", addedPath)
 	}
 
 	return nil
@@ -191,7 +191,7 @@ func (w *WASMEdgeNet) addFilesFromFS(ctx *ExecContext, files []string, logger *s
 			return err
 		}
 		ctx.Args = append(ctx.Args, tmpFile)
-		logger.Info("Added argument", "added", tmpFile)
+		logger.Debug("Added argument", "added", tmpFile)
 	}
 
 	return nil
