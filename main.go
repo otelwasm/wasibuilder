@@ -189,10 +189,12 @@ func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 	}
 
 	for _, rule := range allRules {
-		slog.Info("Applying", "rulea", rule.Name())
+		logger := slog.With("rule", rule.Name())
+
+		logger.Debug("Applying", "rule", rule.Name())
 
 		if err := rule.Apply(&eCtx); err != nil {
-			slog.Error("Error applying rule", "rule", rule.Name(), "error", err)
+			logger.Error("Error applying rule", "rule", rule.Name(), "error", err)
 			return nil, err
 		}
 	}
