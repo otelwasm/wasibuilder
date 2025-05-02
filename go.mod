@@ -1,3 +1,3 @@
-module github.com/tsuzu/wasibuilder
+module github.com/otelwasm/wasibuilder
 
 go 1.24.1
