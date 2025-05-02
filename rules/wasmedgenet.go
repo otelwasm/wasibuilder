@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-//go:embed wasmedgesyscalls/*
-var fs embed.FS
+//go:embed wasmedgenet/*
+var fsForNet embed.FS
 
-type WASMEdgeSyscalls struct {
+type WASMEdgeNet struct {
 }
 
-func (w *WASMEdgeSyscalls) Apply(ctx *ExecContext) error {
+func (w *WASMEdgeNet) Apply(ctx *ExecContext) error {
 	// We're primarily interested in the compile tool
 	if filepath.Base(ctx.Command) != "compile" {
 		return nil
@@ -43,7 +43,7 @@ func (w *WASMEdgeSyscalls) Apply(ctx *ExecContext) error {
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) processSyscallPackage(ctx *ExecContext) error {
+func (w *WASMEdgeNet) processSyscallPackage(ctx *ExecContext) error {
 	var removedFiles = []string{
 		"src/syscall/net_fake.go",
 		"src/syscall/net_wasip1.go",
@@ -68,7 +68,7 @@ func (w *WASMEdgeSyscalls) processSyscallPackage(ctx *ExecContext) error {
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) processNetPackage(ctx *ExecContext) error {
+func (w *WASMEdgeNet) processNetPackage(ctx *ExecContext) error {
 	var removedFiles = []string{
 		"src/net/net_fake.go",
 		"src/net/fd_fake.go",
@@ -108,7 +108,7 @@ func (w *WASMEdgeSyscalls) processNetPackage(ctx *ExecContext) error {
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) processHTTPPackage(ctx *ExecContext) error {
+func (w *WASMEdgeNet) processHTTPPackage(ctx *ExecContext) error {
 	var removedFiles = []string{
 		"src/net/http/transport_default_wasm.go",
 	}
@@ -131,7 +131,7 @@ func (w *WASMEdgeSyscalls) processHTTPPackage(ctx *ExecContext) error {
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) processPollPackage(ctx *ExecContext) error {
+func (w *WASMEdgeNet) processPollPackage(ctx *ExecContext) error {
 	var addedFilesFromFS = []string{
 		"poll/sockopt.go.added",
 	}
@@ -145,7 +145,7 @@ func (w *WASMEdgeSyscalls) processPollPackage(ctx *ExecContext) error {
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) removeFiles(ctx *ExecContext, files []string) (baseDir string, err error) {
+func (w *WASMEdgeNet) removeFiles(ctx *ExecContext, files []string) (baseDir string, err error) {
 	for _, src := range files {
 		for i, arg := range ctx.Args {
 			b, found := strings.CutSuffix(arg, src)
@@ -165,7 +165,7 @@ func (w *WASMEdgeSyscalls) removeFiles(ctx *ExecContext, files []string) (baseDi
 	return baseDir, nil
 }
 
-func (w *WASMEdgeSyscalls) addFilesFromLocal(ctx *ExecContext, baseDir string, files []string) error {
+func (w *WASMEdgeNet) addFilesFromLocal(ctx *ExecContext, baseDir string, files []string) error {
 	for _, src := range files {
 		addedPath := filepath.Join(baseDir, src)
 
@@ -176,10 +176,10 @@ func (w *WASMEdgeSyscalls) addFilesFromLocal(ctx *ExecContext, baseDir string, f
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) addFilesFromFS(ctx *ExecContext, files []string) error {
+func (w *WASMEdgeNet) addFilesFromFS(ctx *ExecContext, files []string) error {
 	for _, src := range files {
 		// Read the file from the embedded filesystem
-		content, err := fs.ReadFile("wasmedgesyscalls/" + src)
+		content, err := fsForNet.ReadFile("wasmedgenet/" + src)
 		if err != nil {
 			slog.Error("Error reading embedded file", "file", src, "error", err)
 			return err
@@ -197,7 +197,7 @@ func (w *WASMEdgeSyscalls) addFilesFromFS(ctx *ExecContext, files []string) erro
 	return nil
 }
 
-func (w *WASMEdgeSyscalls) prepareTmpFile(content string) (string, error) {
+func (w *WASMEdgeNet) prepareTmpFile(content string) (string, error) {
 	fp, err := os.CreateTemp("", "*.go")
 	if err != nil {
 		slog.Error("Error creating temp file", "error", err)
@@ -213,6 +213,6 @@ func (w *WASMEdgeSyscalls) prepareTmpFile(content string) (string, error) {
 	return fp.Name(), nil
 }
 
-func (w *WASMEdgeSyscalls) Name() string {
-	return "WASMEdgeSyscalls"
+func (w *WASMEdgeNet) Name() string {
+	return "WASMEdgeNet"
 }

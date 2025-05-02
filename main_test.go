@@ -18,7 +18,7 @@ func TestAll(t *testing.T) {
 	}
 	wasibuilderPath := filepath.Join(wd, "bin/wasibuilder")
 
-	cmd := exec.Command("go", "build", "-a", "-o", "bin/httpget", "-toolexec", wasibuilderPath, "testdata/httpget/main.go")
+	cmd := exec.Command("go", "build", "-a", "-o", "bin/httpget.wasm", "-toolexec", wasibuilderPath, "testdata/httpget/main.go")
 	cmd.Env = append(
 		os.Environ(),
 		"GOOS=wasip1",
