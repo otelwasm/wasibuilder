@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tsuzu/wasibuilder/rules"
+	"github.com/otelwasm/wasibuilder/rules"
 )
 
 func main() {
