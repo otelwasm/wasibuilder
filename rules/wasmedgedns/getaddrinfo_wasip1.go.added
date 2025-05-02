@@ -1,0 +1,59 @@
+package net
+
+import (
+	"context"
+	"syscall"
+)
+
+func lookupAddr(ctx context.Context, network, host string) ([]IPAddr, error) {
+	var hints addrInfo
+
+	switch network {
+	case "udp", "udp4", "udp6":
+		hints.socketType = syscall.SOCK_DGRAM
+		hints.protocol = syscall.IPPROTO_UDP
+	case "unix", "unixgram":
+		return nil, newDNSError(errNoSuchHost, host, "")
+	case "tcp", "tcp4", "tcp6":
+		fallthrough
+	default:
+		hints.socketType = syscall.SOCK_STREAM
+		hints.protocol = syscall.IPPROTO_TCP
+	}
+
+	switch ipVersion(network) {
+	case '4':
+		hints.family = syscall.AF_INET
+	case '6':
+		hints.family = syscall.AF_INET6
+	default:
+		hints.family = syscall.AF_UNSPEC
+	}
+
+	results := make([]addrInfo, 8)
+	n, err := getaddrinfo(host, "", &hints, results)
+	if err != nil {
+		return nil, newDNSError(errNoSuchHost, host, "")
+	}
+
+	addrs := make([]IPAddr, 0, n)
+	for _, r := range results[:n] {
+		switch a := r.address.(type) {
+		case *syscall.SockaddrInet4:
+			addr := IPAddr{IP: a.Addr[:]}
+			addrs = append(addrs, addr)
+		case *syscall.SockaddrInet6:
+			addr := IPAddr{IP: a.Addr[:], Zone: zoneCache.name(int(a.ZoneId))}
+			addrs = append(addrs, addr)
+		}
+	}
+	if len(addrs) != 0 {
+		return addrs, nil
+	}
+
+	return nil, &DNSError{
+		Err:        "lookup failed",
+		Name:       host,
+		IsNotFound: true,
+	}
+}

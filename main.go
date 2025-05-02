@@ -131,7 +131,11 @@ func toolexec() {
 	args := os.Args[3:]
 
 	// Check if we need to modify args based on the package being compiled
-	args = modifyArgsIfNeeded(toolName, args)
+	args, err := modifyArgsIfNeeded(toolName, args)
+	if err != nil {
+		slog.Error("Error modifying arguments", "error", err)
+		os.Exit(1)
+	}
 
 	execCommands(toolName, args, nil)
 }
@@ -159,12 +163,13 @@ func execCommands(toolName string, args []string, environ []string) {
 }
 
 var allRules = []rules.Rule{
-	&rules.WASMEdgeSyscalls{},
+	&rules.WASMEdgeNet{},
+	&rules.WASMEdgeDNS{},
 }
 
 // modifyArgsIfNeeded checks if the current compilation is for a package we want to modify
 // and returns potentially modified arguments
-func modifyArgsIfNeeded(toolName string, args []string) []string {
+func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 	// Find the package path in the arguments
 	var packagePath string
 	packageIndex := -1
@@ -184,11 +189,13 @@ func modifyArgsIfNeeded(toolName string, args []string) []string {
 	}
 
 	for _, rule := range allRules {
+		slog.Info("Applying", "rulea", rule.Name())
+
 		if err := rule.Apply(&eCtx); err != nil {
 			slog.Error("Error applying rule", "rule", rule.Name(), "error", err)
-			return args
+			return nil, err
 		}
 	}
 
-	return eCtx.Args
+	return eCtx.Args, nil
 }
