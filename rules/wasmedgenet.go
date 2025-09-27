@@ -81,6 +81,10 @@ func (w *WASMEdgeNet) processNetPackage(ctx *ExecContext, logger *slog.Logger) e
 		"src/net/fd_unix.go",
 		"src/net/sock_posix.go",
 		"src/net/file_unix.go",
+
+		// Required for Go 1.25 because of upstream refactoring.
+		// Ref, https://cs.opensource.google/go/go/+/6953ef86cd72a835d398319c4da560c8b78ba28e
+		"src/net/file_posix.go",
 	}
 	var addedFilesFromFS = []string{
 		"net/fake.go.added",
