@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"fmt"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -84,7 +85,7 @@ func DetectGoVersion(goCommand string) (GoVersion, error) {
 	matches := goVersionRegex.FindStringSubmatch(versionStr)
 
 	if len(matches) != 4 {
-		return GoVersion{}, err
+		return GoVersion{}, fmt.Errorf("failed to extract version from version string")
 	}
 
 	major, err := strconv.Atoi(matches[1])
