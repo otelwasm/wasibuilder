@@ -185,13 +185,13 @@ func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 		}
 	}
 
-	// Detect Go version from the toolchain
+	// Get Go version from environment variable
 	var goVersion *rules.GoVersion
-	if version, err := rules.DetectGoVersionFromToolchain(toolName); err == nil {
+	if version, err := rules.GetGoVersion(); err == nil {
 		goVersion = &version
-		slog.Debug("Detected Go version from toolchain", "version", version, "toolchain", toolName)
+		slog.Debug("Got Go version", "version", version)
 	} else {
-		slog.Warn("Failed to detect Go version from toolchain, proceeding without version info", "error", err, "toolchain", toolName)
+		slog.Warn("Failed to get Go version, proceeding without version info", "error", err)
 	}
 
 	eCtx := rules.ExecContext{

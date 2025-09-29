@@ -2,11 +2,10 @@ package rules
 
 import (
 	"fmt"
-	"os/exec"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 )
 
 var goVersionRegex = regexp.MustCompile(`go(\d+)\.(\d+)\.(\d+)`)
@@ -70,81 +69,34 @@ func (v GoVersion) IsAtLeast(major, minor, patch int) bool {
 	return v.Compare(other) >= 0
 }
 
-// DetectGoVersion detects the Go version being used by the toolchain
-func DetectGoVersion(goCommand string) (GoVersion, error) {
-	cmd := exec.Command(goCommand, "version")
-	output, err := cmd.Output()
-	if err != nil {
-		return GoVersion{}, err
+// GetGoVersion gets the Go version from the GOVERSION environment variable
+// This is the most reliable method as it's automatically set by the Go runtime
+func GetGoVersion() (GoVersion, error) {
+	goVersion := os.Getenv("GOVERSION")
+	if goVersion == "" {
+		return GoVersion{}, fmt.Errorf("GOVERSION environment variable not set")
 	}
 
-	// Parse output like "go version go1.25.1 darwin/arm64"
-	versionStr := strings.TrimSpace(string(output))
-
 	// Extract version using precompiled regex
-	matches := goVersionRegex.FindStringSubmatch(versionStr)
+	matches := goVersionRegex.FindStringSubmatch(goVersion)
 
 	if len(matches) != 4 {
-		return GoVersion{}, fmt.Errorf("failed to extract version from version string")
+		return GoVersion{}, fmt.Errorf("failed to parse GOVERSION: %s", goVersion)
 	}
 
 	major, err := strconv.Atoi(matches[1])
 	if err != nil {
-		return GoVersion{}, err
+		return GoVersion{}, fmt.Errorf("invalid major version in GOVERSION: %s", goVersion)
 	}
 
 	minor, err := strconv.Atoi(matches[2])
 	if err != nil {
-		return GoVersion{}, err
+		return GoVersion{}, fmt.Errorf("invalid minor version in GOVERSION: %s", goVersion)
 	}
 
 	patch, err := strconv.Atoi(matches[3])
 	if err != nil {
-		return GoVersion{}, err
-	}
-
-	return GoVersion{
-		Major: major,
-		Minor: minor,
-		Patch: patch,
-	}, nil
-}
-
-// DetectGoVersionFromToolchain detects the Go version directly from the toolchain binary
-// It uses the tool's own version flag (e.g., compile -V) to get version information
-func DetectGoVersionFromToolchain(toolPath string) (GoVersion, error) {
-	// Try to get version directly from the tool using -V flag
-	cmd := exec.Command(toolPath, "-V")
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback to detecting from "go" command in PATH
-		return DetectGoVersion("go")
-	}
-
-	// Parse output like "compile version go1.25.1"
-	versionStr := strings.TrimSpace(string(output))
-
-	// Extract version using precompiled regex
-	matches := goVersionRegex.FindStringSubmatch(versionStr)
-
-	if len(matches) != 4 {
-		// Fallback to detecting from "go" command in PATH
-		return DetectGoVersion("go")
-	}
-
-	major, err := strconv.Atoi(matches[1])
-	if err != nil {
-		return GoVersion{}, err
-	}
-
-	minor, err := strconv.Atoi(matches[2])
-	if err != nil {
-		return GoVersion{}, err
-	}
-
-	patch, err := strconv.Atoi(matches[3])
-	if err != nil {
-		return GoVersion{}, err
+		return GoVersion{}, fmt.Errorf("invalid patch version in GOVERSION: %s", goVersion)
 	}
 
 	return GoVersion{
