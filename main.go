@@ -185,20 +185,30 @@ func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 		}
 	}
 
+	// Detect Go version from the toolchain
+	var goVersion *rules.GoVersion
+	if version, err := rules.DetectGoVersionFromToolchain(toolName); err == nil {
+		goVersion = &version
+		slog.Debug("Detected Go version from toolchain", "version", version, "toolchain", toolName)
+	} else {
+		slog.Warn("Failed to detect Go version from toolchain, proceeding without version info", "error", err, "toolchain", toolName)
+	}
+
 	eCtx := rules.ExecContext{
 		Command:      toolName,
 		Args:         args,
 		Package:      packagePath,
 		PackageIndex: packageIndex,
+		GoVersion:    goVersion,
 	}
 
 	for _, rule := range allRules {
 		logger := slog.With("rule", rule.Name())
 
-		logger.Debug("Applying", "rule", rule.Name())
+		logger.Debug("Applying rule", "rule", rule.Name(), "package", packagePath, "command", toolName)
 
 		if err := rule.Apply(&eCtx); err != nil {
-			logger.Error("Error applying rule", "rule", rule.Name(), "error", err)
+			logger.Error("Error applying rule", "rule", rule.Name(), "package", packagePath, "error", err)
 			return nil, err
 		}
 	}
