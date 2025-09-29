@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/otelwasm/wasibuilder/internal/version"
 	"github.com/otelwasm/wasibuilder/rules"
 )
 
@@ -186,10 +187,10 @@ func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 	}
 
 	// Get Go version from environment variable
-	var goVersion *rules.GoVersion
-	if version, err := rules.GetGoVersion(); err == nil {
-		goVersion = &version
-		slog.Debug("Got Go version", "version", version)
+	var goVersion *version.Version
+	if v, err := version.GetGoVersion(); err == nil {
+		goVersion = &v
+		slog.Debug("Got Go version", "version", v)
 	} else {
 		slog.Warn("Failed to get Go version, proceeding without version info", "error", err)
 	}
