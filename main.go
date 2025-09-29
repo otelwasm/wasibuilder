@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/otelwasm/wasibuilder/internal/version"
 	"github.com/otelwasm/wasibuilder/rules"
 )
 
@@ -185,20 +186,30 @@ func modifyArgsIfNeeded(toolName string, args []string) ([]string, error) {
 		}
 	}
 
+	// Get Go version from environment variable
+	var goVersion *version.Version
+	if v, err := version.GetGoVersion(); err == nil {
+		goVersion = &v
+		slog.Debug("Got Go version", "version", v)
+	} else {
+		slog.Warn("Failed to get Go version, proceeding without version info", "error", err)
+	}
+
 	eCtx := rules.ExecContext{
 		Command:      toolName,
 		Args:         args,
 		Package:      packagePath,
 		PackageIndex: packageIndex,
+		GoVersion:    goVersion,
 	}
 
 	for _, rule := range allRules {
 		logger := slog.With("rule", rule.Name())
 
-		logger.Debug("Applying", "rule", rule.Name())
+		logger.Debug("Applying rule", "rule", rule.Name(), "package", packagePath, "command", toolName)
 
 		if err := rule.Apply(&eCtx); err != nil {
-			logger.Error("Error applying rule", "rule", rule.Name(), "error", err)
+			logger.Error("Error applying rule", "rule", rule.Name(), "package", packagePath, "error", err)
 			return nil, err
 		}
 	}

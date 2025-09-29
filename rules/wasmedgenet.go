@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/otelwasm/wasibuilder/internal/version"
 )
 
 //go:embed wasmedgenet/*
@@ -82,6 +84,17 @@ func (w *WASMEdgeNet) processNetPackage(ctx *ExecContext, logger *slog.Logger) e
 		"src/net/sock_posix.go",
 		"src/net/file_unix.go",
 	}
+
+	// Add file_posix.go only for Go 1.25 and above
+	// Required for Go 1.25 because of upstream refactoring.
+	// Ref, https://cs.opensource.google/go/go/+/6953ef86cd72a835d398319c4da560c8b78ba28e
+	if ctx.GoVersion != nil && ctx.GoVersion.IsAtLeast(version.Version{Major: 1, Minor: 25, Patch: 0}) {
+		addedFiles = append(addedFiles, "src/net/file_posix.go")
+		logger.Debug("Adding file_posix.go for Go 1.25+", "package", ctx.Package, "version", ctx.GoVersion)
+	} else {
+		logger.Debug("Skipping file_posix.go for Go < 1.25", "package", ctx.Package, "version", ctx.GoVersion)
+	}
+
 	var addedFilesFromFS = []string{
 		"net/fake.go.added",
 		"net/sockopt_wasip1.go.added",
