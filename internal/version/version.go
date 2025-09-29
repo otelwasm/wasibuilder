@@ -26,8 +26,8 @@ func (v Version) Compare(other Version) int {
 }
 
 // IsAtLeast returns true if this version is >= the specified version
-func (v Version) IsAtLeast(major, minor, patch int) bool {
-	return v.Compare(Version{Major: major, Minor: minor, Patch: patch}) >= 0
+func (v Version) IsAtLeast(other Version) bool {
+	return v.Compare(other) >= 0
 }
 
 // GetGoVersion gets the Go version from the GOVERSION environment variable
